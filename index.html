@@ -1,0 +1,607 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>SwipeUp Dating — Likes You + Matches + Chat/Call</title>
+<style>
+  :root{
+    --bg:#0b1020; --card:#11172a; --text:#e6eefc; --muted:#9aa8c7;
+    --like:#22c55e; --nope:#ef4444; --accent:#7c3aed; --panel:#0f1530;
+    --btn:#121a36; --btnb:#24306a;
+  }
+  html,body{height:100%;margin:0;background:linear-gradient(180deg,#0b1020,#0e142a);}
+  body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Inter,Arial,sans-serif;color:var(--text);}
+  .wrap{max-width:420px;margin:0 auto; min-height:100%; display:flex; flex-direction:column;}
+
+  header{padding:16px 16px 0; display:flex; align-items:center; justify-content:space-between; gap:10px; flex-wrap:wrap}
+  header h1{font-size:18px; margin:0; letter-spacing:.3px;}
+  .count{font-size:13px; color:var(--muted)}
+  .topBtns{display:flex; gap:8px}
+  .topbtn{padding:8px 12px; border-radius:10px; background:var(--btn); color:#d9e1ff; border:1px solid var(--btnb); cursor:pointer}
+
+  .stack{position:relative; flex:1; display:flex; align-items:center; justify-content:center; padding:24px 16px;}
+
+  .card{
+    position:absolute; width:100%; max-width:420px; height:68vh; max-height:640px;
+    background:var(--card); border-radius:18px; box-shadow:0 20px 60px rgba(10,20,50,.35);
+    overflow:hidden; user-select:none; touch-action:none; will-change:transform,opacity;
+    display:flex; flex-direction:column;
+  }
+  .img{flex:1; background:#000 center/cover no-repeat;}
+  .info{padding:10px 12px 12px; display:flex; justify-content:space-between; align-items:center; gap:10px}
+  .name{font-weight:700; font-size:18px}
+  .meta{font-size:13px; color:var(--muted)}
+  .actions{display:flex; gap:8px}
+  .chip{border:1px solid var(--btnb); background:var(--btn); color:#dbe3ff; border-radius:9px; padding:6px 9px; cursor:pointer; font-size:13px}
+
+  .badge{
+    position:absolute; left:12px; right:12px; top:12px; pointer-events:none;
+    display:flex; justify-content:space-between; font-weight:800; letter-spacing:2px;
+  }
+  .badge span{padding:8px 10px; border-radius:10px; backdrop-filter:blur(6px); opacity:0; transform:scale(.9)}
+  .like{color:#052a12; background:rgba(34,197,94,.85); box-shadow:0 6px 18px rgba(34,197,94,.4)}
+  .nope{color:#2a0505; background:rgba(239,68,68,.85); box-shadow:0 6px 18px rgba(239,68,68,.4)}
+  .hint{position:absolute; bottom:12px; left:0; right:0; text-align:center; font-size:12px; color:var(--muted)}
+
+  footer{padding:12px 16px 24px; display:flex; gap:14px; justify-content:center;}
+  .btn{
+    width:64px; height:64px; border-radius:50%; border:0; cursor:pointer; background:#0f1730;
+    box-shadow:0 10px 30px rgba(12,18,40,.35) inset, 0 6px 16px rgba(0,0,0,.3);
+    color:#cbd5ff; font-size:24px; display:grid; place-items:center; transition:transform .12s ease;
+  }
+  .btn:active{transform:scale(.96)}
+  .btn-like{background:linear-gradient(160deg,#053,#0a4); color:#d2ffe3}
+  .btn-nope{background:linear-gradient(160deg,#3a0b0b,#5a0f0f); color:#ffd4d4}
+
+  .card:nth-last-child(2){transform:translateY(6px) scale(.985); opacity:.9}
+  .card:nth-last-child(3){transform:translateY(12px) scale(.97); opacity:.85}
+  .card:nth-last-child(4){transform:translateY(18px) scale(.955); opacity:.8}
+
+  /* Bottom sheets / modals */
+  .sheet{
+    position:fixed; inset:auto 0 0 0; background:var(--panel); border-top-left-radius:16px; border-top-right-radius:16px;
+    box-shadow:0 -10px 30px rgba(0,0,0,.4); transform:translateY(100%); transition:transform .25s ease; z-index:20;
+  }
+  .sheet.open{transform:translateY(0)}
+  .sheet .hd{display:flex; justify-content:space-between; align-items:center; gap:12px; padding:14px 16px; border-bottom:1px solid #1b2245}
+  .sheet h2{margin:0; font-size:16px}
+  .sheet .x{background:#1a2246; color:#d9e1ff; border:1px solid #2a3773; padding:6px 10px; border-radius:8px; cursor:pointer}
+
+  /* Create Profile */
+  .form{padding:14px 16px 18px; display:grid; gap:12px}
+  .form label{font-size:13px; color:#c7d0f5}
+  .form input[type="text"]{width:100%; padding:10px 12px; border-radius:10px; border:1px solid #24306a; background:#0c1434; color:#e6eefc}
+  .picker{display:grid; grid-template-columns: 96px 1fr; gap:12px; align-items:center}
+  .preview{width:96px; height:96px; background:#0a0f25 center/cover no-repeat; border-radius:12px; border:1px dashed #2a3773}
+  .file{padding:8px 10px; border-radius:10px; border:1px solid #24306a; background:#0c1434; color:#cbd5ff}
+  .save{margin-top:6px; padding:10px 12px; border-radius:12px; border:0; cursor:pointer; background:#2a3773; color:#fff; font-weight:700}
+  .err{color:#ffb4b4; font-size:12px}
+
+  /* Chat sheet */
+  .chat{position:fixed; inset:auto 0 0 0; background:#0c1434; border-top-left-radius:16px; border-top-right-radius:16px;
+        box-shadow:0 -10px 30px rgba(0,0,0,.4); transform:translateY(100%); transition:transform .25s ease; z-index:30;}
+  .chat.open{transform:translateY(0)}
+  .chat .hd{display:flex; justify-content:space-between; align-items:center; padding:12px 14px; border-bottom:1px solid #1b2245}
+  .chat h3{margin:0; font-size:15px}
+  .chat .x{background:#141c3f; color:#eaf0ff; border:1px solid #2a3773; padding:6px 10px; border-radius:8px; cursor:pointer}
+  .msgs{height:42vh; overflow:auto; padding:12px 14px; display:flex; flex-direction:column; gap:8px}
+  .msg{max-width:75%; padding:8px 10px; border-radius:12px}
+  .me{align-self:flex-end; background:#24306a}
+  .them{align-self:flex-start; background:#13204f}
+  .composer{display:flex; gap:8px; padding:12px 14px; border-top:1px solid #1b2245}
+  .composer input{flex:1; padding:10px 12px; border-radius:10px; border:1px solid #24306a; background:#0f1730; color:#f0f5ff}
+  .composer button{padding:10px 12px; border-radius:10px; background:#2a3773; color:#fff; border:0; cursor:pointer}
+
+  /* Call modal */
+  .call{position:fixed; inset:0; display:none; align-items:center; justify-content:center; background:rgba(0,0,0,.55); z-index:40;}
+  .call.open{display:flex}
+  .callPane{background:#0f1730; border:1px solid #21306a; border-radius:16px; padding:12px; width:min(92vw,520px);}
+  .callHd{display:flex; justify-content:space-between; align-items:center; margin-bottom:8px}
+  .callHd h3{margin:0; font-size:15px}
+  .vids{display:grid; grid-template-columns:1fr 1fr; gap:8px}
+  video{width:100%; height:220px; background:#000; border-radius:12px}
+  .callBtns{display:flex; gap:10px; justify-content:center; margin-top:10px}
+  .end{background:#7a0f1a; color:#ffd7d7; border:0; padding:10px 12px; border-radius:10px; cursor:pointer}
+  .start{background:#1e7a45; color:#d7ffea; border:0; padding:10px 12px; border-radius:10px; cursor:pointer}
+
+  /* Likes You sheet */
+  .likes{padding:12px 14px 18px; display:grid; gap:12px}
+  .grid{display:grid; grid-template-columns:repeat(2, 1fr); gap:12px}
+  .mini{
+    background:#0c1434; border:1px solid #22306a; border-radius:14px; overflow:hidden;
+    display:flex; flex-direction:column;
+  }
+  .mini .pic{height:140px; background:#000 center/cover no-repeat}
+  .mini .cap{padding:8px 10px; display:grid; gap:6px}
+  .mini .nm{font-weight:700; font-size:13px}
+  .mini .bad{font-size:12px; color:#9aa8c7}
+  .mini .row{display:flex; gap:6px; flex-wrap:wrap}
+  .mini button{border:1px solid #2a3773; background:#182355; color:#e8eeff; border-radius:8px; padding:6px 8px; cursor:pointer; font-size:12px}
+  .mini .ok{background:#1d6d3c; border-color:#24804a}
+  .mini .muted{opacity:.75}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <h1>SwipeUp</h1>
+    <div class="count" id="count">0 liked</div>
+    <div class="topBtns">
+      <button class="topbtn" id="openLikes">Likes You <span id="likesCount" style="opacity:.8"></span></button>
+      <button class="topbtn" id="openSheet">Create Profile</button>
+    </div>
+  </header>
+
+  <main class="stack" id="stack" aria-live="polite"></main>
+  <div class="hint">Swipe <b>up</b> to Like, <b>down</b> to Nope · ↑ / ↓ keys work too · Use Chat 💬 or Call 📞</div>
+
+  <footer>
+    <button class="btn btn-nope" id="btnNope" aria-label="Nope (down)">↓</button>
+    <button class="btn btn-like" id="btnLike" aria-label="Like (up)">↑</button>
+  </footer>
+</div>
+
+<!-- Create Profile bottom sheet -->
+<div class="sheet" id="sheet" aria-hidden="true">
+  <div class="hd">
+    <h2>Create your profile</h2>
+    <button class="x" id="closeSheet">Close</button>
+  </div>
+  <form class="form" id="profileForm">
+    <div>
+      <label for="name">Display name</label>
+      <input id="name" type="text" placeholder="e.g., Alex, 27 — Miami" maxlength="40" required />
+    </div>
+    <div class="picker">
+      <div class="preview" id="preview"></div>
+      <div>
+        <label for="photo">Photo</label><br/>
+        <input class="file" id="photo" type="file" accept="image/*" capture="environment" />
+        <div class="err" id="err"></div>
+      </div>
+    </div>
+    <button class="save" type="submit">Save profile</button>
+  </form>
+</div>
+
+<!-- Likes You sheet -->
+<div class="sheet" id="likesSheet" aria-hidden="true">
+  <div class="hd">
+    <h2>Likes You</h2>
+    <button class="x" id="closeLikes">Close</button>
+  </div>
+  <div class="likes">
+    <div class="grid" id="likesGrid"></div>
+    <div style="font-size:12px;color:#9aa8c7">Tip: Like back to match. Once matched, you can chat or start an internet call.</div>
+  </div>
+</div>
+
+<!-- Chat sheet -->
+<div class="chat" id="chat">
+  <div class="hd">
+    <h3 id="chatTitle">Chat</h3>
+    <button class="x" id="chatClose">Close</button>
+  </div>
+  <div class="msgs" id="msgs"></div>
+  <div class="composer">
+    <input id="msgInput" type="text" placeholder="Type a message…" />
+    <button id="sendBtn">Send</button>
+  </div>
+</div>
+
+<!-- Call modal (WebRTC loopback demo) -->
+<div class="call" id="call">
+  <div class="callPane">
+    <div class="callHd">
+      <h3 id="callTitle">Call</h3>
+      <button class="x" id="callClose">Close</button>
+    </div>
+    <div class="vids">
+      <div>
+        <div style="font-size:12px;color:#9aa8c7;margin-bottom:4px">You</div>
+        <video id="local" autoplay playsinline muted></video>
+      </div>
+      <div>
+        <div style="font-size:12px;color:#9aa8c7;margin-bottom:4px">Remote</div>
+        <video id="remote" autoplay playsinline></video>
+      </div>
+    </div>
+    <div class="callBtns">
+      <button class="start" id="startCall">Start</button>
+      <button class="end" id="endCall" disabled>End</button>
+    </div>
+    <div style="font-size:12px;color:#9aa8c7;margin-top:8px">
+      Demo: the “remote” video is a <b>loopback</b> peer on this page. For real calls, swap the loopback wiring with a signaling server (WebSocket/Firestore/etc.).
+    </div>
+  </div>
+</div>
+
+<script>
+/* ---------- Demo data & storage ---------- */
+const DEFAULTS = [
+  {id:"u1", name:"Ava, 26 — Seattle",  img:"https://picsum.photos/id/1011/600/900"},
+  {id:"u2", name:"Maya, 28 — New York",img:"https://picsum.photos/id/1025/600/900"},
+  {id:"u3", name:"Noah, 27 — Austin",  img:"https://picsum.photos/id/1005/600/900"},
+  {id:"u4", name:"Leo, 29 — Chicago",  img:"https://picsum.photos/id/1012/600/900"},
+  {id:"u5", name:"Zoe, 25 — Denver",   img:"https://picsum.photos/id/1004/600/900"},
+  {id:"u6", name:"Kai, 30 — LA",       img:"https://picsum.photos/id/1016/600/900"},
+];
+
+const LS_PROFILES   = 'swipeup_profiles';
+const LS_LIKED      = 'swipeup_liked';       // your likes
+const LS_LIKES_YOU  = 'swipeup_likes_you';   // people who liked you
+const LS_MATCHES    = 'swipeup_matches';     // mutual likes
+const LS_CHAT_PREFIX= 'swipeup_chat_';
+
+let PROFILES = JSON.parse(localStorage.getItem(LS_PROFILES) || 'null') || DEFAULTS.slice();
+let liked    = JSON.parse(localStorage.getItem(LS_LIKED) || '[]');       // array of profiles
+let likesYou = JSON.parse(localStorage.getItem(LS_LIKES_YOU) || 'null'); // array of profiles
+let matches  = JSON.parse(localStorage.getItem(LS_MATCHES) || '[]');     // array of profiles
+
+/* Seed "likes you" for demo if empty */
+if(!likesYou){
+  const pool = PROFILES.slice(0,4); // pick a few
+  likesYou = shuffle(pool).slice(0,3);
+  saveLikesYou();
+}
+
+/* ---------- UI refs ---------- */
+const stackEl = document.getElementById('stack');
+const btnLike = document.getElementById('btnLike');
+const btnNope = document.getElementById('btnNope');
+const countEl = document.getElementById('count');
+const likesBtn= document.getElementById('openLikes');
+const likesCountEl = document.getElementById('likesCount');
+
+function updateCounts(){
+  countEl.textContent = `${liked.length} liked`;
+  likesCountEl.textContent = `(${likesYou.length})`;
+}
+
+/* ---------- Build card stack ---------- */
+function buildCard(p){
+  const card = document.createElement('article');
+  card.className = 'card';
+  card.setAttribute('role','group');
+  card.setAttribute('aria-label', p.name);
+
+  const badge = document.createElement('div');
+  badge.className='badge';
+  const like = document.createElement('span'); like.className='like'; like.textContent='LIKE';
+  const nope = document.createElement('span'); nope.className='nope'; nope.textContent='NOPE';
+  badge.append(like, nope);
+
+  const img = document.createElement('div');
+  img.className='img'; img.style.backgroundImage = `url('${p.img}')`;
+
+  const info = document.createElement('div');
+  info.className='info';
+  info.innerHTML = `<div><div class="name">${p.name}</div><div class="meta">Swipe up or down</div></div>`;
+
+  const actions = document.createElement('div');
+  actions.className='actions';
+  const chatBtn=document.createElement('button');
+  chatBtn.className='chip'; chatBtn.textContent='💬 Chat';
+  chatBtn.addEventListener('click', ()=> openChat(p));
+
+  const callBtn=document.createElement('button');
+  callBtn.className='chip'; callBtn.textContent='📞 Call';
+  callBtn.addEventListener('click', ()=> openCall(p));
+
+  actions.append(chatBtn, callBtn);
+  info.append(actions);
+
+  card.append(badge, img, info);
+  attachSwipe(card, p, like, nope);
+  return card;
+}
+function loadDeck(list){
+  stackEl.innerHTML = '';
+  list.forEach(p => stackEl.appendChild(buildCard(p))); // bottom→top
+}
+loadDeck(PROFILES);
+updateCounts();
+
+/* ---------- Swipe handling ---------- */
+const DRAG = {active:false, startX:0, startY:0, currentX:0, currentY:0, el:null};
+
+function attachSwipe(card, profile, likeBadge, nopeBadge){
+  const onPointerDown = e=>{
+    DRAG.active=true; DRAG.el=card;
+    DRAG.startX = e.clientX ?? e.touches?.[0].clientX;
+    DRAG.startY = e.clientY ?? e.touches?.[0].clientY;
+    card.setPointerCapture?.(e.pointerId ?? 0);
+  };
+
+  const onPointerMove = e=>{
+    if(!DRAG.active || DRAG.el!==card) return;
+    DRAG.currentX = (e.clientX ?? e.touches?.[0].clientX) - DRAG.startX;
+    DRAG.currentY = (e.clientY ?? e.touches?.[0].clientY) - DRAG.startY;
+    const r = Math.atan2(DRAG.currentY, DRAG.currentX) * 0.12;
+    card.style.transform = `translate(${DRAG.currentX}px, ${DRAG.currentY}px) rotate(${r}rad)`;
+    const up = Math.max(0, -DRAG.currentY), down = Math.max(0, DRAG.currentY);
+    likeBadge.style.opacity = Math.min(1, up/120);
+    likeBadge.style.transform = `scale(${0.9 + Math.min(0.2, up/300)})`;
+    nopeBadge.style.opacity = Math.min(1, down/120);
+    nopeBadge.style.transform = `scale(${0.9 + Math.min(0.2, down/300)})`;
+  };
+
+  const settle = (likedIt)=>{
+    const toY = likedIt ? -window.innerHeight*1.2 : window.innerHeight*1.2;
+    card.style.transition = 'transform .25s ease-out, opacity .25s ease-out';
+    card.style.transform  = `translate(0px, ${toY}px) rotate(${likedIt?-0.15:0.15}rad)`;
+    card.style.opacity = .9;
+    setTimeout(()=> card.remove(), 260);
+
+    if(likedIt){
+      likeProfile(profile);
+    }
+    if(stackEl.children.length<=1){
+      setTimeout(()=>loadDeck(PROFILES), 350);
+    }
+  };
+
+  const onPointerUp = ()=>{
+    if(!DRAG.active || DRAG.el!==card) return;
+    const dy = DRAG.currentY, threshold = 120;
+    if(dy < -threshold) settle(true);
+    else if(dy > threshold) settle(false);
+    else { card.style.transition='transform .18s ease'; card.style.transform='translate(0,0)'; }
+    likeBadge.style.opacity=0; likeBadge.style.transform='scale(.9)';
+    nopeBadge.style.opacity=0; nopeBadge.style.transform='scale(.9)';
+    DRAG.active=false; DRAG.el=null; DRAG.currentX=DRAG.currentY=0;
+  };
+
+  card.addEventListener('pointerdown', onPointerDown);
+  window.addEventListener('pointermove', onPointerMove);
+  window.addEventListener('pointerup', onPointerUp);
+  card.addEventListener('touchstart', onPointerDown, {passive:true});
+  window.addEventListener('touchmove', onPointerMove, {passive:false});
+  window.addEventListener('touchend', onPointerUp);
+
+  card.tabIndex = 0;
+  card.addEventListener('keydown', e=>{
+    if(e.key==='ArrowUp'){ e.preventDefault(); settle(true); }
+    if(e.key==='ArrowDown'){ e.preventDefault(); settle(false); }
+  });
+}
+
+/* Buttons */
+document.getElementById('btnLike').addEventListener('click', ()=>triggerTop(true));
+document.getElementById('btnNope').addEventListener('click', ()=>triggerTop(false));
+function triggerTop(like){
+  const top = stackEl.lastElementChild; if(!top) return;
+  const evt = new KeyboardEvent('keydown', {key: like?'ArrowUp':'ArrowDown'}); top.dispatchEvent(evt);
+}
+
+/* ---------- Likes You UI ---------- */
+const likesSheet = document.getElementById('likesSheet');
+const likesGrid  = document.getElementById('likesGrid');
+document.getElementById('openLikes').addEventListener('click', openLikes);
+document.getElementById('closeLikes').addEventListener('click', closeLikes);
+
+function openLikes(){ renderLikes(); likesSheet.classList.add('open'); likesSheet.setAttribute('aria-hidden','false'); }
+function closeLikes(){ likesSheet.classList.remove('open'); likesSheet.setAttribute('aria-hidden','true'); }
+
+function renderLikes(){
+  likesGrid.innerHTML='';
+  const likedIds = new Set(liked.map(p=>p.id));
+  const matchIds = new Set(matches.map(p=>p.id));
+  likesYou.forEach(p=>{
+    const item = document.createElement('div');
+    item.className = 'mini';
+    const pic = document.createElement('div'); pic.className='pic'; pic.style.backgroundImage=`url('${p.img}')`;
+    const cap = document.createElement('div'); cap.className='cap';
+    cap.innerHTML = `<div class="nm">${p.name}</div>
+                     <div class="bad">${matchIds.has(p.id)?'Matched ✅':'Liked you'}</div>`;
+    const row = document.createElement('div'); row.className='row';
+
+    if(matchIds.has(p.id)){
+      const chatBtn = document.createElement('button'); chatBtn.textContent='💬 Chat'; chatBtn.addEventListener('click', ()=>openChat(p));
+      const callBtn = document.createElement('button'); callBtn.textContent='📞 Call'; callBtn.addEventListener('click', ()=>openCall(p));
+      row.append(chatBtn, callBtn);
+    }else{
+      const likedAlready = likedIds.has(p.id);
+      const likeBackBtn = document.createElement('button'); likeBackBtn.textContent= likedAlready?'Liked':'Like back';
+      if(likedAlready){
+        likeBackBtn.classList.add('muted');
+      }else{
+        likeBackBtn.classList.add('ok');
+        likeBackBtn.addEventListener('click', ()=>{
+          likeProfile(p);
+          renderLikes(); // refresh view
+        });
+      }
+      row.append(likeBackBtn);
+    }
+
+    cap.append(row);
+    item.append(pic, cap);
+    likesGrid.appendChild(item);
+  });
+}
+
+/* ---------- Like / Match logic ---------- */
+function likeProfile(p){
+  // add to liked if not already
+  if(!liked.find(x=>x.id===p.id)){
+    liked.push(p); saveLiked();
+  }
+  // if they liked you, it's a match
+  if(likesYou.find(x=>x.id===p.id)){
+    if(!matches.find(x=>x.id===p.id)){
+      matches.push(p); saveMatches();
+      // optional: simple toast
+      console.log('It\'s a match with', p.name);
+    }
+  }
+  updateCounts();
+}
+
+function saveLiked(){ localStorage.setItem(LS_LIKED, JSON.stringify(liked)); }
+function saveLikesYou(){ localStorage.setItem(LS_LIKES_YOU, JSON.stringify(likesYou)); }
+function saveMatches(){ localStorage.setItem(LS_MATCHES, JSON.stringify(matches)); }
+
+/* ---------- Create Profile sheet ---------- */
+const sheet   = document.getElementById('sheet');
+const openBtn = document.getElementById('openSheet');
+const closeBtn= document.getElementById('closeSheet');
+const form    = document.getElementById('profileForm');
+const nameIn  = document.getElementById('name');
+const photoIn = document.getElementById('photo');
+const preview = document.getElementById('preview');
+const errEl   = document.getElementById('err');
+
+function openSheet(){ sheet.classList.add('open'); sheet.setAttribute('aria-hidden','false'); }
+function closeSheet(){ sheet.classList.remove('open'); sheet.setAttribute('aria-hidden','true'); errEl.textContent=''; }
+openBtn.addEventListener('click', openSheet);
+closeBtn.addEventListener('click', closeSheet);
+
+let pickedDataURL='';
+photoIn.addEventListener('change', async (e)=>{
+  const f=e.target.files?.[0];
+  if(!f){ pickedDataURL=''; preview.style.backgroundImage='none'; return; }
+  if(!f.type.startsWith('image/')){ errEl.textContent='Please choose an image file.'; return; }
+  const url=await fileToDataURL(f);
+  pickedDataURL=url; preview.style.backgroundImage=`url('${url}')`; errEl.textContent='';
+});
+function fileToDataURL(file){ return new Promise((res,rej)=>{ const fr=new FileReader(); fr.onload=()=>res(fr.result); fr.onerror=rej; fr.readAsDataURL(file); }); }
+
+form.addEventListener('submit', (e)=>{
+  e.preventDefault();
+  const name = nameIn.value.trim();
+  if(!name){ errEl.textContent='Please enter a display name.'; return; }
+  if(!pickedDataURL){ errEl.textContent='Please add a photo.'; return; }
+  const newP = { id:'u_'+Date.now(), name, img:pickedDataURL };
+  PROFILES.push(newP);
+  localStorage.setItem(LS_PROFILES, JSON.stringify(PROFILES));
+  stackEl.appendChild(buildCard(newP)); // top of deck
+  nameIn.value=''; pickedDataURL=''; preview.style.backgroundImage='none';
+  closeSheet();
+});
+
+/* ---------- Chat ---------- */
+const chat = document.getElementById('chat');
+const chatTitle = document.getElementById('chatTitle');
+const chatClose = document.getElementById('chatClose');
+const msgsEl = document.getElementById('msgs');
+const msgInput = document.getElementById('msgInput');
+const sendBtn = document.getElementById('sendBtn');
+let currentChatId = null;
+
+function openChat(profile){
+  // allow chat only if matched; otherwise nudge like-back
+  if(!matches.find(m=>m.id===profile.id)){
+    alert('You can chat once you both like each other. Like back to match!');
+    return;
+  }
+  currentChatId = profile.id;
+  chatTitle.textContent = `Chat with ${profile.name}`;
+  renderMessages();
+  chat.classList.add('open');
+}
+function closeChat(){ chat.classList.remove('open'); }
+chatClose.addEventListener('click', closeChat);
+
+function getMsgs(){
+  if(!currentChatId) return [];
+  return JSON.parse(localStorage.getItem(LS_CHAT_PREFIX+currentChatId) || '[]');
+}
+function saveMsgs(arr){
+  if(!currentChatId) return;
+  localStorage.setItem(LS_CHAT_PREFIX+currentChatId, JSON.stringify(arr));
+}
+function renderMessages(){
+  msgsEl.innerHTML='';
+  const arr=getMsgs();
+  arr.forEach(m=>{
+    const div=document.createElement('div');
+    div.className='msg '+(m.me?'me':'them');
+    div.textContent = m.text;
+    msgsEl.appendChild(div);
+  });
+  msgsEl.scrollTop = msgsEl.scrollHeight;
+}
+sendBtn.addEventListener('click', sendMsg);
+msgInput.addEventListener('keydown', e=>{ if(e.key==='Enter'){ e.preventDefault(); sendMsg(); } });
+function sendMsg(){
+  const t=msgInput.value.trim(); if(!t || !currentChatId) return;
+  const arr=getMsgs(); arr.push({me:true, text:t, at:Date.now()});
+  saveMsgs(arr); msgInput.value=''; renderMessages();
+
+  // tiny auto-reply demo
+  setTimeout(()=>{
+    const a=getMsgs(); a.push({me:false, text:'Got it! 😊', at:Date.now()}); saveMsgs(a); renderMessages();
+  }, 700);
+}
+
+/* ---------- Call (WebRTC loopback demo) ---------- */
+const call = document.getElementById('call');
+const callTitle = document.getElementById('callTitle');
+const callClose = document.getElementById('callClose');
+const startCall = document.getElementById('startCall');
+const endCall = document.getElementById('endCall');
+const vLocal = document.getElementById('local');
+const vRemote = document.getElementById('remote');
+
+let pc1=null, pc2=null, localStream=null;
+
+function openCall(profile){
+  if(!matches.find(m=>m.id===profile.id)){
+    alert('You can call once you both like each other. Like back to match!');
+    return;
+  }
+  callTitle.textContent = `Call with ${profile.name}`;
+  call.classList.add('open');
+}
+function closeCall(){ call.classList.remove('open'); stopCall(); }
+callClose.addEventListener('click', closeCall);
+
+startCall.addEventListener('click', async ()=>{
+  startCall.disabled=true; endCall.disabled=false;
+  try{
+    localStream = await navigator.mediaDevices.getUserMedia({video:true, audio:true});
+    vLocal.srcObject = localStream;
+
+    pc1 = new RTCPeerConnection();  // local
+    pc2 = new RTCPeerConnection();  // remote (loopback)
+
+    localStream.getTracks().forEach(t=> pc1.addTrack(t, localStream));
+    pc2.ontrack = e=> { vRemote.srcObject = e.streams[0]; };
+
+    pc1.onicecandidate = e=> e.candidate && pc2.addIceCandidate(e.candidate);
+    pc2.onicecandidate = e=> e.candidate && pc1.addIceCandidate(e.candidate);
+
+    const offer = await pc1.createOffer();
+    await pc1.setLocalDescription(offer);
+    await pc2.setRemoteDescription(offer);
+    const answer = await pc2.createAnswer();
+    await pc2.setLocalDescription(answer);
+    await pc1.setRemoteDescription(answer);
+  }catch(err){
+    alert('Camera/microphone error: '+err.message);
+    startCall.disabled=false; endCall.disabled=true;
+  }
+});
+endCall.addEventListener('click', stopCall);
+function stopCall(){
+  startCall.disabled=false; endCall.disabled=true;
+  [pc1,pc2].forEach(pc=>{ try{pc&&pc.close();}catch{} });
+  pc1=pc2=null;
+  if(localStream){ localStream.getTracks().forEach(t=>t.stop()); localStream=null; }
+  vLocal.srcObject=null; vRemote.srcObject=null;
+}
+
+/* ---------- Utils ---------- */
+function shuffle(a){ for(let i=a.length-1;i>0;i--){ const j=Math.floor(Math.random()*(i+1)); [a[i],a[j]]=[a[j],a[i]]; } return a; }
+function triggerTop(like){
+  const top = stackEl.lastElementChild; if(!top) return;
+  const evt = new KeyboardEvent('keydown', {key: like?'ArrowUp':'ArrowDown'}); top.dispatchEvent(evt);
+}
+
+/* ---------- Init ---------- */
+updateCounts();
+</script>
+</body>
+</html>
